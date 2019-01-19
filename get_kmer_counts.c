@@ -12,6 +12,7 @@ const int NUM_ARGS = 5;
 const int MAX_STRING_SIZE = 512;
 
 static inline bool tolerable_match( char *a, char *b, int size, int num_mismatches );
+sequence_t **count_and_read_seqs( char *filename );
 
 int main( int argc, char **argv )
 {
@@ -38,6 +39,12 @@ int main( int argc, char **argv )
 
     omp_set_num_threads( num_threads );
 
+    sequence_t **refseqs     = NULL;
+    sequence_t **design_seqs = NULL;
+
+    refseqs     = count_and_read_seqs( ref_file_name );
+    design_seqs = count_and_read_seqs( design_file_name );
+
     return EXIT_SUCCESS;
 }
 
@@ -63,4 +70,29 @@ static inline bool tolerable_match( char *a, char *b, int size, int num_mismatch
                 }
         }
     return true;
+}
+
+sequence_t **count_and_read_seqs( char *filename )
+{
+
+    FILE *open_file = NULL;
+    sequence_t **local_seqs = NULL;
+    int num_seqs = 0;
+
+    char local_filename[ MAX_STRING_SIZE ];
+
+    strcpy( local_filename, filename );
+
+    open_file = fopen( local_filename, "r" );
+
+    num_seqs = count_seqs_in_file( open_file );
+
+    local_seqs = malloc( sizeof( sequence_t *) * num_seqs );
+
+    read_sequences( open_file, local_seqs );
+
+    fclose( open_file );
+
+    return local_seqs;
+
 }
