@@ -8,17 +8,23 @@
 #include "array_list.h"
 #include "protein_oligo_library.h"
 
-const int NUM_ARGS = 5;
-const int MAX_STRING_SIZE = 512;
+const int NUM_ARGS         = 5;
+const int WINDOW_SIZE      = 9;
+const int NUM_MISMATCHES   = 1;
+const int MAX_STRING_SIZE  = 512;
 const int LARGE_TABLE_SIZE = 4000000;
 
 static inline bool tolerable_match( char *a, char *b, int size, int num_mismatches );
 sequence_t **count_and_read_seqs( char *filename );
 static void substring_indices( char *src, char *dest, const int start, const int end );
 static inline int num_substrings( const int str_len, const int window_size );
-static void subset_lists_local( char **dest_arr, char *seq, const int window_size );
+static void subset_lists_local( char **dest_arr, char *seq,
+                                int sequence_len, const int window_size );
 hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs );
-
+void get_kmer_totals( hash_table_t *target_kmers, sequence_t **designed_oligos, int num_oligos, int num_mismatches );
+void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
+                          unsigned int num_items, int num_mismatches
+                        );
 int main( int argc, char **argv )
 {
 
@@ -69,9 +75,100 @@ int main( int argc, char **argv )
 
     printf( "Num subs: %d\n", target_seqs->size );
 
-
+    get_kmer_totals( target_seqs, design_seqs,
+                     num_seqs_design, NUM_MISMATCHES
+                   );
 
     return EXIT_SUCCESS;
+}
+
+void get_kmer_totals( hash_table_t *target_kmers,
+                      sequence_t **designed_oligos,
+                      int num_oligos, int num_mismatches
+                    )
+{
+    hash_table_t *target_copy = NULL;
+    hash_table_t *target_ptr  = target_kmers;
+    HT_Entry **items          = NULL;
+    char **subset_kmers       = NULL;
+    char       *current_oligo = NULL;
+
+
+    unsigned int index = 0;
+    
+    items = ht_get_items( target_ptr );
+
+    #pragma omp parallel shared( target_ptr, items, designed_oligos ) \
+            private( index, target_copy, current_oligo, subset_kmers )
+    {
+        int oligo_size = designed_oligos[ 0 ]->sequence->size; // assume all oligos are same size
+        int num_subsets = num_substrings( oligo_size, WINDOW_SIZE );
+
+        int inner_index = 0;
+        int *val_copy = NULL;
+
+        HT_Entry **my_items    = NULL;
+        HT_Entry *current_item = NULL;
+
+        int *current_val = NULL;
+
+        target_copy = malloc( sizeof( hash_table_t ) );
+        subset_kmers = malloc( sizeof( char * ) * num_subsets );
+
+        ht_init( target_copy, LARGE_TABLE_SIZE );
+
+        for( index = 0; index < target_ptr->size; index++ )
+            {
+                val_copy = malloc( sizeof( int ) );
+                *val_copy = *( (int*)(items[ index ]->value) );
+
+                ht_add( target_copy, items[ index ]->key,
+                        val_copy );
+            }
+
+        #pragma omp for
+        for( index = 0; index < (unsigned int) num_oligos; index++ )
+            {
+                current_oligo = designed_oligos[ index ]->sequence->data;
+
+                subset_lists_local( subset_kmers, current_oligo,
+                                    oligo_size, WINDOW_SIZE
+                                  );
+
+                for( inner_index = 0; inner_index < num_subsets; inner_index++ )
+                    {
+
+
+                        get_mismatch_counts( target_copy, items, subset_kmers[ inner_index ],
+                                             target_kmers->size, num_mismatches
+                                           );
+                    }
+            }
+
+        my_items = ht_get_items( target_copy );
+        #pragma omp critical
+        {
+            for( index = 0; index < target_kmers->size; index++ )
+                {
+                    current_item = my_items[ index ];
+                    current_val = (int*) ht_find( target_kmers, current_item->key );
+                    *current_val += *(int*) current_item->value;
+                }
+        }
+
+        for( index = 0; index < target_kmers->size; index++ )
+            {
+                free( my_items[ index ]->value );
+            }
+        free( my_items );
+
+        ht_clear( target_copy );
+        free( target_copy );
+        free( subset_kmers );
+    }
+
+    free( items );
+
 }
 
 static inline bool tolerable_match( char *a, char *b, int size, int num_mismatches )
@@ -141,9 +238,10 @@ static inline int num_substrings( const int str_len, const int window_size )
     return str_len - window_size + 1;
 }
 
-static void subset_lists_local( char **dest_arr, char *seq, const int window_size )
+static void subset_lists_local( char **dest_arr, char *seq,
+                                int sequence_len, const int window_size )
 {
-    size_t seq_len = strlen( seq );
+    int seq_len = sequence_len;
     int num_substr = num_substrings( seq_len, window_size );
     int index = 0;
     char *substr = NULL;
@@ -164,7 +262,6 @@ static void subset_lists_local( char **dest_arr, char *seq, const int window_siz
 
 hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs )
 {
-    const int WINDOW_SIZE = 9;
     hash_table_t *table = NULL;
     char **substr_arr   = NULL;
 
@@ -181,7 +278,8 @@ hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs )
         {
             num_subsets = num_substrings( strlen( seqs[ index ]->sequence->data ), WINDOW_SIZE );
             substr_arr = malloc( sizeof( char *) * num_subsets );
-            subset_lists_local( substr_arr, seqs[ index ]->sequence->data, WINDOW_SIZE );
+            subset_lists_local( substr_arr, seqs[ index ]->sequence->data,
+                                seqs[ index ]->sequence->size, WINDOW_SIZE );
 
             for( inner_index = 0; inner_index < num_subsets; inner_index++ )
                 {
@@ -190,7 +288,7 @@ hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs )
                             if( !ht_find( table, substr_arr[ inner_index ] ) )
                                 {
                                     new_val = malloc( sizeof( int ) );
-                                    *new_val = 0;
+                                    *new_val = 1;
                                     ht_add( table, substr_arr[ inner_index ], new_val );
                                 }
                         }
@@ -202,4 +300,26 @@ hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs )
         }
 
     return table;
+}
+void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
+                          unsigned int num_items, int num_mismatches
+                     )
+
+{
+    unsigned int index = 0;
+    unsigned int oligo_size = strlen( items[ 0 ]->key );
+    int *value = NULL;
+    HT_Entry *current_item = NULL;
+
+    for( index = 0; index < num_items; index++ )
+        {
+            current_item = items[ index ];
+
+            if( tolerable_match( current_item->key, kmer, oligo_size, num_mismatches ) )
+                {
+                    value = (int*) ht_find( table, current_item->key );
+                    (*value)++;
+                }
+            
+        }
 }
