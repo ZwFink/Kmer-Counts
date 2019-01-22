@@ -26,6 +26,8 @@ void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
                           unsigned int num_items, int num_mismatches
                         );
 void write_outputs( char *out_file, hash_table_t *table );
+void clear_table( hash_table_t *table );
+
 int main( int argc, char **argv )
 {
 
@@ -74,13 +76,13 @@ int main( int argc, char **argv )
 
     target_seqs = seqs_to_kmer_table( refseqs, num_seqs_ref );
 
-    printf( "Num subs: %d\n", target_seqs->size );
-
     get_kmer_totals( target_seqs, design_seqs,
                      num_seqs_design, NUM_MISMATCHES
                    );
 
     write_outputs( outfile_name, target_seqs );
+
+    clear_table( target_seqs );
 
     return EXIT_SUCCESS;
 }
@@ -145,8 +147,11 @@ void get_kmer_totals( hash_table_t *target_kmers,
                         get_mismatch_counts( target_copy, items, subset_kmers[ inner_index ],
                                              target_kmers->size, num_mismatches
                                            );
+                        free( subset_kmers[ inner_index ] );
                     }
             }
+
+        free( subset_kmers );
 
         my_items = ht_get_items( target_copy );
         #pragma omp critical
@@ -167,9 +172,9 @@ void get_kmer_totals( hash_table_t *target_kmers,
 
         ht_clear( target_copy );
         free( target_copy );
-        free( subset_kmers );
     }
 
+    free( subset_kmers );
     free( items );
 
 }
@@ -354,4 +359,22 @@ void write_outputs( char *out_file, hash_table_t *table )
     free( ht_items );
     
     
+}
+
+void clear_table( hash_table_t *table )
+{
+    HT_Entry **items = NULL;
+    unsigned int index = 0;
+
+    items = ht_get_items( table );
+
+    for( index = 0; index < table->size; index++ )
+        {
+            free( items[ index ]->value );
+        }
+
+
+    ht_clear( table );
+    free( table );
+    free( items );
 }
