@@ -67,6 +67,10 @@ int main( int argc, char **argv )
 
     target_seqs = seqs_to_kmer_table( refseqs, num_seqs_ref );
 
+    printf( "Num subs: %d\n", target_seqs->size );
+
+
+
     return EXIT_SUCCESS;
 }
 
@@ -146,7 +150,7 @@ static void subset_lists_local( char **dest_arr, char *seq, const int window_siz
 
     for( index = 0; index < num_substr; index++ )
         {
-            substr = malloc( sizeof( char ) * window_size );
+            substr = malloc( sizeof( char ) * window_size + 1 );
 
             substr[ 0 ] = '\0';
 
