@@ -1,4 +1,4 @@
-CFLAGS= -O0 -Wall -Wextra -std=c99 -pedantic -fopenmp
+CFLAGS= -O0 -Wall -Wextra -std=c99 -pedantic -fopenmp -lpthread
 
 get_kmer_counts: get_kmer_counts.o protein_oligo_library.o dynamic_string.o hash_table.o array_list.o set.o 
 	gcc $(CFLAGS) get_kmer_counts.o protein_oligo_library.o dynamic_string.o hash_table.o array_list.o set.o -o get_kmer_counts 

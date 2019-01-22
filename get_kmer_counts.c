@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
@@ -44,6 +45,9 @@ int main( int argc, char **argv )
 
     hash_table_t *target_seqs = NULL;
 
+    double start_time = 0;
+    double end_time   = 0;
+
     if( argc != NUM_ARGS )
         {
             printf( "USAGE: get_kmer_counts design_file_name "
@@ -71,6 +75,8 @@ int main( int argc, char **argv )
     sequence_t **refseqs     = NULL;
     sequence_t **design_seqs = NULL;
 
+    start_time = omp_get_wtime();
+    
     refseqs     = count_and_read_seqs( ref_file_name );
     design_seqs = count_and_read_seqs( design_file_name );
 
@@ -81,6 +87,10 @@ int main( int argc, char **argv )
                    );
 
     write_outputs( outfile_name, target_seqs );
+
+    end_time = omp_get_wtime();
+
+    printf( "Finished in %f seconds\n", end_time - start_time );
 
     clear_table( target_seqs );
 
