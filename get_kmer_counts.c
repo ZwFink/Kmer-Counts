@@ -13,6 +13,7 @@ const int MAX_STRING_SIZE = 512;
 
 static inline bool tolerable_match( char *a, char *b, int size, int num_mismatches );
 sequence_t **count_and_read_seqs( char *filename );
+static void substring_indices( char *src, char *dest, const int start, const int end );
 
 int main( int argc, char **argv )
 {
@@ -95,4 +96,17 @@ sequence_t **count_and_read_seqs( char *filename )
 
     return local_seqs;
 
+}
+
+static void substring_indices( char *src, char *dest, const int start, const int end )
+{
+    int index       = 0;
+    int inner_index = 0;
+
+    for( index = start; index < end; index++ )
+        {
+            dest[ inner_index ] = src[ index ];
+
+            dest[ ++inner_index ] = '\0';
+        }
 }
