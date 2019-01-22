@@ -25,6 +25,7 @@ void get_kmer_totals( hash_table_t *target_kmers, sequence_t **designed_oligos, 
 void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
                           unsigned int num_items, int num_mismatches
                         );
+void write_outputs( char *out_file, hash_table_t *table );
 int main( int argc, char **argv )
 {
 
@@ -78,6 +79,8 @@ int main( int argc, char **argv )
     get_kmer_totals( target_seqs, design_seqs,
                      num_seqs_design, NUM_MISMATCHES
                    );
+
+    write_outputs( outfile_name, target_seqs );
 
     return EXIT_SUCCESS;
 }
@@ -288,7 +291,7 @@ hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs )
                             if( !ht_find( table, substr_arr[ inner_index ] ) )
                                 {
                                     new_val = malloc( sizeof( int ) );
-                                    *new_val = 1;
+                                    *new_val = 0;
                                     ht_add( table, substr_arr[ inner_index ], new_val );
                                 }
                         }
@@ -322,4 +325,33 @@ void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
                 }
             
         }
+}
+
+void write_outputs( char *out_file, hash_table_t *table )
+{
+    FILE *open_file = fopen( out_file, "w" );
+    HT_Entry **ht_items = ht_get_items( table );
+    HT_Entry *current_item = NULL;
+    unsigned int index = 0;
+    const char *HEADER = "Kmer\tScore";
+
+    fprintf( open_file, "%s\n", HEADER );
+
+    for( index = 0; index < table->size; index++ )
+        {
+            current_item = ht_items[ index ];
+
+            fprintf( open_file, "%s\t%d\n",
+                     current_item->key,
+                     *(int*) current_item->value
+                   );
+        }
+
+
+
+
+    fclose( open_file );
+    free( ht_items );
+    
+    
 }
