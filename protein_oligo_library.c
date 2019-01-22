@@ -139,7 +139,6 @@ void read_sequences( FILE* file_to_read, sequence_t** in_sequence )
 
     dynamic_string_t* line = (dynamic_string_t*) malloc( sizeof( dynamic_string_t ) );
     dynamic_string_t* sequence = NULL;
-    char *newline = NULL;
 
     ds_init( line );
     has_line = get_a_line( file_to_read, line );
@@ -147,7 +146,7 @@ void read_sequences( FILE* file_to_read, sequence_t** in_sequence )
     while( has_line )
         {
 
-            /* // remove newline-character if the line is not empty */
+            // remove newline-character if the line is not empty
             if( strchr( line->data, '\n' ) != NULL
                 && line->size )
                 {
