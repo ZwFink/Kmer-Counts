@@ -8,10 +8,10 @@
 
 #define DEFAULT_SIZE 1000
 
-void set_init( set_t* to_init )
+void set_init( set_t* to_init, unsigned int size )
 {
     to_init->data = malloc( sizeof( hash_table_t ) );
-    ht_init( to_init->data, DEFAULT_SIZE );
+    ht_init( to_init->data, size );
 }
 
 
@@ -33,7 +33,11 @@ void set_clear( set_t* set_to_clear )
 {
     ht_clear( set_to_clear->data );
     free( set_to_clear->data );
-    free( set_to_clear );
+}
+
+HT_Entry **set_get_items( set_t *set )
+{
+    return ht_get_items( set->data );
 }
 
 void set_difference( set_t* first, set_t* second )
