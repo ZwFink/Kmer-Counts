@@ -12,7 +12,7 @@ typedef struct set_t
  * Initializes set's hash_table data
  * @param init set member to initialize
  **/
-void set_init( set_t* to_init );
+void set_init( set_t* to_init, unsigned int size );
 
 /**
  * Adds a string value to a set.
@@ -22,6 +22,7 @@ void set_init( set_t* to_init );
  **/
 void set_add( set_t* set_to_add, char* add_data );
 int set_check( set_t* source, char* item );
+HT_Entry **set_get_items( set_t *set );
 
 /**
  * Removes a string from a set
