@@ -21,6 +21,9 @@ static void substring_indices( char *src, char *dest, const int start, const int
 static inline int num_substrings( const int str_len, const int window_size );
 static void subset_lists_local( char **dest_arr, char *seq,
                                 int sequence_len, const int window_size );
+static void subset_lists_set( set_t *dest, char *seq,
+                              int sequence_len, const int window_size );
+
 hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs );
 void get_kmer_totals( hash_table_t *target_kmers, sequence_t **designed_oligos, int num_oligos, int num_mismatches );
 void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
@@ -105,7 +108,7 @@ void get_kmer_totals( hash_table_t *target_kmers,
     hash_table_t *target_copy = NULL;
     hash_table_t *target_ptr  = target_kmers;
     HT_Entry **items          = NULL;
-    char **subset_kmers       = NULL;
+    set_t *subset_kmers       = NULL;
     char       *current_oligo = NULL;
 
 
@@ -119,16 +122,18 @@ void get_kmer_totals( hash_table_t *target_kmers,
         int oligo_size = designed_oligos[ 0 ]->sequence->size; // assume all oligos are same size
         int num_subsets = num_substrings( oligo_size, WINDOW_SIZE );
 
-        int inner_index = 0;
+        unsigned int inner_index = 0;
         int *val_copy = NULL;
 
-        HT_Entry **my_items    = NULL;
-        HT_Entry *current_item = NULL;
+        HT_Entry **my_items     = NULL;
+        HT_Entry **subset_items = NULL;
+        HT_Entry *current_item  = NULL;
 
         int *current_val = NULL;
 
         target_copy = malloc( sizeof( hash_table_t ) );
-        subset_kmers = malloc( sizeof( char * ) * num_subsets );
+
+        subset_kmers = malloc( sizeof( set_t ) );
 
         ht_init( target_copy, LARGE_TABLE_SIZE );
 
@@ -144,21 +149,25 @@ void get_kmer_totals( hash_table_t *target_kmers,
         #pragma omp for
         for( index = 0; index < (unsigned int) num_oligos; index++ )
             {
+                set_init( subset_kmers, num_subsets );
                 current_oligo = designed_oligos[ index ]->sequence->data;
 
-                subset_lists_local( subset_kmers, current_oligo,
+                subset_lists_set(   subset_kmers, current_oligo,
                                     oligo_size, WINDOW_SIZE
                                   );
 
-                for( inner_index = 0; inner_index < num_subsets; inner_index++ )
+                subset_items = set_get_items( subset_kmers );
+
+                for( inner_index = 0; inner_index < subset_kmers->data->size; inner_index++ )
                     {
 
 
-                        get_mismatch_counts( target_copy, items, subset_kmers[ inner_index ],
+                        get_mismatch_counts( target_copy, items, subset_items[ inner_index ]->key,
                                              target_kmers->size, num_mismatches
                                            );
-                        free( subset_kmers[ inner_index ] );
                     }
+                free( subset_items );
+                set_clear( subset_kmers );
             }
 
         free( subset_kmers );
@@ -275,6 +284,24 @@ static void subset_lists_local( char **dest_arr, char *seq,
                              );
 
             dest_arr[ index ] = substr;
+        }
+}
+
+static void subset_lists_set( set_t *dest, char *seq,
+                              int sequence_len, const int window_size )
+{
+    int seq_len = sequence_len;
+    int num_substr = num_substrings( seq_len, window_size );
+    int index = 0;
+    char substr[ window_size ];
+
+    for( index = 0; index < num_substr; index++ )
+        {
+            substr[ 0 ] = '\0';
+            substring_indices( seq, substr, index,
+                               index + window_size
+                             );
+            set_add( dest, substr );
         }
 }
 
