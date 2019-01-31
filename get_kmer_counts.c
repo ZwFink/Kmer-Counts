@@ -20,15 +20,17 @@ typedef struct kmer
     char *seq;
     unsigned int kmer_start;
     unsigned int kmer_end;
+    unsigned int kmer_score;
 } kmer_t;
 
 static inline bool tolerable_match( char *a, char *b, int size, int num_mismatches );
+static inline void add_valid_kmers( kmer_t **kmers, const unsigned int num_subsets, hash_table_t *table );
 sequence_t **count_and_read_seqs( char *filename );
 static void substring_indices( char *src, char *dest, const int start, const int end );
 static inline int num_substrings( const int str_len, const int window_size );
-static void subset_lists_local( char **dest_arr, char *seq,
+static void subset_lists_local( kmer_t **dest_arr, char *seq,
                                 int sequence_len, const int window_size );
-static void subset_lists_set( set_t *dest, char *seq,
+static void subset_lists_ht( hash_table_t *dest, char *seq,
                               int sequence_len, const int window_size );
 
 hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs );
@@ -38,6 +40,7 @@ void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
                         );
 void write_outputs( char *out_file, hash_table_t *table );
 void clear_table( hash_table_t *table );
+void kmer_init( kmer_t *kmer, char *seq, unsigned int start, unsigned int end, unsigned int score );
 
 int main( int argc, char **argv )
 {
@@ -112,11 +115,11 @@ void get_kmer_totals( hash_table_t *target_kmers,
                       int num_oligos, int num_mismatches
                     )
 {
-    hash_table_t *target_copy = NULL;
-    hash_table_t *target_ptr  = target_kmers;
-    HT_Entry **items          = NULL;
-    set_t *subset_kmers       = NULL;
-    char       *current_oligo = NULL;
+    hash_table_t *target_copy  = NULL;
+    hash_table_t *target_ptr   = target_kmers;
+    HT_Entry **items           = NULL;
+    hash_table_t *subset_kmers = NULL;
+    char       *current_oligo  = NULL;
 
 
     unsigned int index = 0;
@@ -156,25 +159,27 @@ void get_kmer_totals( hash_table_t *target_kmers,
         #pragma omp for
         for( index = 0; index < (unsigned int) num_oligos; index++ )
             {
-                set_init( subset_kmers, num_subsets );
+                ht_init( subset_kmers, num_subsets );
                 current_oligo = designed_oligos[ index ]->sequence->data;
 
-                subset_lists_set(   subset_kmers, current_oligo,
-                                    oligo_size, WINDOW_SIZE
-                                  );
+                subset_lists_ht( subset_kmers, current_oligo,
+                                 oligo_size, WINDOW_SIZE
+                               );
 
-                subset_items = set_get_items( subset_kmers );
+                subset_items = ht_get_items( subset_kmers );
 
-                for( inner_index = 0; inner_index < subset_kmers->data->size; inner_index++ )
+                for( inner_index = 0; inner_index < subset_kmers->size; inner_index++ )
                     {
 
 
                         get_mismatch_counts( target_copy, items, subset_items[ inner_index ]->key,
                                              target_kmers->size, num_mismatches
                                            );
+                        free( ( (kmer_t*)(subset_items[ inner_index ]->value) )->seq );
+                        free( subset_items[ inner_index ]->value );
                     }
                 free( subset_items );
-                set_clear( subset_kmers );
+                ht_clear( subset_kmers );
             }
 
         free( subset_kmers );
@@ -272,56 +277,83 @@ static inline int num_substrings( const int str_len, const int window_size )
     return str_len - window_size + 1;
 }
 
-static void subset_lists_local( char **dest_arr, char *seq,
+static void subset_lists_local( kmer_t **dest_arr, char *seq,
                                 int sequence_len, const int window_size )
 {
     int seq_len = sequence_len;
     int num_substr = num_substrings( seq_len, window_size );
     int index = 0;
-    char *substr = NULL;
+
+    unsigned int start      = 0;
+    unsigned int end        = 0;
+    unsigned const int KMER_SCORE = 0;
+
+    char *substr     = NULL;
+    kmer_t *new_kmer = NULL;
 
     for( index = 0; index < num_substr; index++ )
         {
-            substr = malloc( sizeof( char ) * window_size + 1 );
+            substr   = malloc( sizeof( char ) * window_size + 1 );
+            new_kmer = malloc( sizeof( kmer_t ) );
+
+            start = index;
+            end   = index + window_size;
 
             substr[ 0 ] = '\0';
 
-            substring_indices( seq, substr, index,
-                               index + window_size
+            substring_indices( seq, substr, start,
+                               end
                              );
 
-            dest_arr[ index ] = substr;
+            kmer_init( new_kmer, substr, start, end, KMER_SCORE );
+
+            dest_arr[ index ] = new_kmer;
         }
 }
 
-static void subset_lists_set( set_t *dest, char *seq,
+static void subset_lists_ht( hash_table_t *dest, char *seq,
                               int sequence_len, const int window_size )
 {
     int seq_len = sequence_len;
     int num_substr = num_substrings( seq_len, window_size );
     int index = 0;
+
+    unsigned int start = 0;
+    unsigned int end   = 0;
+    
     char substr[ window_size ];
+
+    kmer_t *new_kmer = NULL;
 
     for( index = 0; index < num_substr; index++ )
         {
             substr[ 0 ] = '\0';
-            substring_indices( seq, substr, index,
-                               index + window_size
+
+            start = index;
+            end   = index + window_size;
+            substring_indices( seq, substr, start,
+                               end
                              );
-            set_add( dest, substr );
+
+            if( !ht_find( dest, substr ) )
+                {
+                    new_kmer = malloc( sizeof( kmer_t ) );
+
+                    kmer_init( new_kmer, substr,
+                               start, end, 0
+                             );
+                    ht_add( dest, new_kmer->seq, new_kmer );
+                }
         }
 }
 
 hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs )
 {
     hash_table_t *table = NULL;
-    char **substr_arr   = NULL;
+    kmer_t **kmer_arr   = NULL;
 
     int index       = 0;
-    int inner_index = 0;
     int num_subsets = 0;
-
-    int *new_val    = NULL;
 
     table = malloc( sizeof( hash_table_t ) );
     ht_init( table, LARGE_TABLE_SIZE );
@@ -329,26 +361,13 @@ hash_table_t *seqs_to_kmer_table( sequence_t **seqs, const int num_seqs )
     for( index = 0; index < num_seqs; index++ )
         {
             num_subsets = num_substrings( strlen( seqs[ index ]->sequence->data ), WINDOW_SIZE );
-            substr_arr = malloc( sizeof( char *) * num_subsets );
-            subset_lists_local( substr_arr, seqs[ index ]->sequence->data,
+            kmer_arr = malloc( sizeof( kmer_t*) * num_subsets );
+            subset_lists_local( kmer_arr, seqs[ index ]->sequence->data,
                                 seqs[ index ]->sequence->size, WINDOW_SIZE );
 
-            for( inner_index = 0; inner_index < num_subsets; inner_index++ )
-                {
-                    if( strchr( substr_arr[ inner_index ], 'X' ) == NULL )
-                        {
-                            if( !ht_find( table, substr_arr[ inner_index ] ) )
-                                {
-                                    new_val = malloc( sizeof( int ) );
-                                    *new_val = 0;
-                                    ht_add( table, substr_arr[ inner_index ], new_val );
-                                }
-                        }
+            add_valid_kmers( kmer_arr, num_subsets, table );
 
-                    free( substr_arr[ inner_index ] );
-                }
-
-            free( substr_arr );
+            free( kmer_arr );
         }
 
     return table;
@@ -360,7 +379,7 @@ void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
 {
     unsigned int index = 0;
     unsigned int oligo_size = strlen( items[ 0 ]->key );
-    int *value = NULL;
+    kmer_t *value = NULL;
     HT_Entry *current_item = NULL;
 
     for( index = 0; index < num_items; index++ )
@@ -369,11 +388,23 @@ void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
 
             if( tolerable_match( current_item->key, kmer, oligo_size, num_mismatches ) )
                 {
-                    value = (int*) ht_find( table, current_item->key );
-                    (*value)++;
+                    value = (kmer_t*) ht_find( table, current_item->key );
+                    value->kmer_score++;
                 }
             
         }
+}
+
+void kmer_init( kmer_t *kmer, char *seq,
+                unsigned int start,
+                unsigned int end, unsigned int score
+              )
+{
+    kmer->seq = seq;
+
+    kmer->kmer_start = start;
+    kmer->kmer_end   = end;
+    kmer->kmer_score = score;
 }
 
 void write_outputs( char *out_file, hash_table_t *table )
@@ -381,18 +412,23 @@ void write_outputs( char *out_file, hash_table_t *table )
     FILE *open_file = fopen( out_file, "w" );
     HT_Entry **ht_items = ht_get_items( table );
     HT_Entry *current_item = NULL;
+    kmer_t *current_kmer   = NULL;
+    
     unsigned int index = 0;
-    const char *HEADER = "Kmer\tScore";
+    const char *HEADER = "Kmer\tScore\tStart\tEnd";
 
     fprintf( open_file, "%s\n", HEADER );
 
     for( index = 0; index < table->size; index++ )
         {
             current_item = ht_items[ index ];
+            current_kmer = current_item->value;
 
-            fprintf( open_file, "%s\t%d\n",
+            fprintf( open_file, "%s\t%u\t%u\t%u\n",
                      current_item->key,
-                     *(int*) current_item->value
+                     current_kmer->kmer_score,
+                     current_kmer->kmer_start,
+                     current_kmer->kmer_end
                    );
         }
 
@@ -421,4 +457,43 @@ void clear_table( hash_table_t *table )
     ht_clear( table );
     free( table );
     free( items );
+}
+
+static inline void add_valid_kmers( kmer_t **kmers, const unsigned int num_subsets, hash_table_t *table )
+{
+    unsigned int index;
+    kmer_t *current_kmer = NULL;
+
+    bool delete_flag = false;
+
+    for( index = 0; index < num_subsets; index++ )
+        {
+            current_kmer = kmers[ index ];
+            if( strchr( current_kmer->seq, 'X' ) == NULL )
+                {
+                    if( !ht_find( table, current_kmer->seq ) )
+                        {
+                            ht_add( table,
+                                    current_kmer->seq,
+                                    current_kmer
+                                    );
+                        }
+                    else
+                        {
+                            delete_flag = true;
+                        }
+                }
+            else
+                {
+                    delete_flag = true;
+                }
+
+            if( delete_flag )
+                {
+                    delete_flag = false;
+
+                    free( current_kmer->seq );
+                    free( current_kmer );
+                }
+        }
 }
