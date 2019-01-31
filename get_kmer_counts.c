@@ -202,6 +202,7 @@ void get_kmer_totals( hash_table_t *target_kmers,
 
         for( index = 0; index < target_kmers->size; index++ )
             {
+                free( ((kmer_t*)(my_items[ index ]->value))->seq );
                 free( my_items[ index ]->value );
             }
         free( my_items );
@@ -396,6 +397,7 @@ void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
                 {
                     value = (kmer_t*) ht_find( table, current_item->key );
                     value->kmer_score++;
+
                 }
             
         }
