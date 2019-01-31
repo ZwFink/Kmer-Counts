@@ -146,7 +146,7 @@ void get_kmer_totals( hash_table_t *target_kmers,
         HT_Entry **subset_items = NULL;
         HT_Entry *current_item  = NULL;
 
-        int *current_val = NULL;
+        kmer_t *current_val = NULL;
 
         target_copy  = malloc( sizeof( hash_table_t ) );
         subset_kmers = malloc( sizeof( hash_table_t ) );
@@ -195,8 +195,8 @@ void get_kmer_totals( hash_table_t *target_kmers,
             for( index = 0; index < target_kmers->size; index++ )
                 {
                     current_item = my_items[ index ];
-                    current_val = (int*) ht_find( target_kmers, current_item->key );
-                    *current_val += *(int*) current_item->value;
+                    current_val = (kmer_t*) ht_find( target_kmers, current_item->key );
+                    current_val->kmer_score += ( (kmer_t*) current_item->value)->kmer_score;
                 }
         }
 
