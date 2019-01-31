@@ -148,9 +148,8 @@ void get_kmer_totals( hash_table_t *target_kmers,
 
         int *current_val = NULL;
 
-        target_copy = malloc( sizeof( hash_table_t ) );
-
-        subset_kmers = malloc( sizeof( set_t ) );
+        target_copy  = malloc( sizeof( hash_table_t ) );
+        subset_kmers = malloc( sizeof( hash_table_t ) );
 
         ht_init( target_copy, LARGE_TABLE_SIZE );
 
@@ -179,7 +178,7 @@ void get_kmer_totals( hash_table_t *target_kmers,
 
 
                         get_mismatch_counts( target_copy, items, subset_items[ inner_index ]->key,
-                                             target_kmers->size, num_mismatches
+                                             target_copy->size, num_mismatches
                                            );
                         free( ( (kmer_t*)(subset_items[ inner_index ]->value) )->seq );
                         free( subset_items[ inner_index ]->value );
@@ -327,12 +326,13 @@ static void subset_lists_ht( hash_table_t *dest, char *seq,
     unsigned int start = 0;
     unsigned int end   = 0;
     
-    char substr[ window_size ];
+    char *substr;
 
     kmer_t *new_kmer = NULL;
 
     for( index = 0; index < num_substr; index++ )
         {
+            substr = malloc( sizeof( char ) * window_size + 1 );
             substr[ 0 ] = '\0';
 
             start = index;
