@@ -15,6 +15,13 @@ const int NUM_MISMATCHES   = 1;
 const int MAX_STRING_SIZE  = 512;
 const int LARGE_TABLE_SIZE = 4000000;
 
+typedef struct kmer
+{
+    char *seq;
+    unsigned int kmer_start;
+    unsigned int kmer_end;
+} kmer_t;
+
 static inline bool tolerable_match( char *a, char *b, int size, int num_mismatches );
 sequence_t **count_and_read_seqs( char *filename );
 static void substring_indices( char *src, char *dest, const int start, const int end );
