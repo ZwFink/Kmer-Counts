@@ -1,4 +1,4 @@
-CFLAGS= -O0 -Wall -Wextra -std=c99 -pedantic -fopenmp -lpthread
+CFLAGS= -O0 -Wall -Wextra -std=c99 -pedantic -lpthread
 
 get_kmer_counts: get_kmer_counts.o protein_oligo_library.o dynamic_string.o hash_table.o array_list.o set.o 
 	gcc $(CFLAGS) get_kmer_counts.o protein_oligo_library.o dynamic_string.o hash_table.o array_list.o set.o -o get_kmer_counts 
@@ -20,11 +20,11 @@ set.o: set.c set.h
 
 
 .PHONY: debug clean optimized profile
-debug: CFLAGS+= -g -O0
+debug: CFLAGS+= -g -O0 
 debug: clean
 debug: get_kmer_counts
 
-optimized: CFLAGS += -O3  -ffast-math
+optimized: CFLAGS += -O3  -ffast-math -fopenmp
 optimized: clean
 optimized: get_kmer_counts
 

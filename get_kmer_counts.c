@@ -9,6 +9,10 @@
 #include "array_list.h"
 #include "protein_oligo_library.h"
 
+#ifndef _OPENMP
+    #define omp_get_wtime() 0
+#endif
+
 const int NUM_ARGS         = 5;
 const int WINDOW_SIZE      = 9;
 const int NUM_MISMATCHES   = 1;
@@ -83,7 +87,9 @@ int main( int argc, char **argv )
 
     num_threads = atoi( argv[ 4 ] );
 
+    #ifdef _OPENMP
     omp_set_num_threads( num_threads );
+    #endif
 
     sequence_t **refseqs     = NULL;
     sequence_t **design_seqs = NULL;
