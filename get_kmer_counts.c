@@ -46,6 +46,7 @@ void get_mismatch_counts( hash_table_t *table, HT_Entry **items, char *kmer,
 void write_outputs( char *out_file, hash_table_t *table );
 void clear_table( hash_table_t *table );
 void kmer_init( kmer_t *kmer, char *seq, unsigned int start, unsigned int end, unsigned int score );
+void clear_seqs( sequence_t **seqs, int num_seqs );
 
 int main( int argc, char **argv )
 {
@@ -112,6 +113,8 @@ int main( int argc, char **argv )
 
     printf( "Finished in %f seconds\n", end_time - start_time );
 
+    clear_seqs( refseqs, num_seqs_ref );
+    clear_seqs( design_seqs, num_seqs_design );
     clear_table( target_seqs );
 
     return EXIT_SUCCESS;
@@ -514,4 +517,16 @@ static inline void copy_kmer( kmer_t *dest, kmer_t *src )
     dest->kmer_start = src->kmer_start;
     dest->kmer_end   = src->kmer_end;
     dest->kmer_score = src->kmer_score;
+}
+ 
+void clear_seqs( sequence_t **seqs, int num_seqs )
+{
+    int index = 0;
+
+    for( index = 0; index < num_seqs; index++ )
+        {
+            ds_clear( seqs[ index ]->sequence );
+            free( seqs[ index ]->name );
+            free( seqs[ index ] );
+        }
 }
