@@ -29,6 +29,7 @@ typedef struct kmer
 
 static inline bool tolerable_match( char *a, char *b, int size, int num_mismatches );
 static inline void add_valid_kmers( kmer_t **kmers, const unsigned int num_subsets, hash_table_t *table );
+static inline void copy_kmer( kmer_t *dest, kmer_t *src );
 sequence_t **count_and_read_seqs( char *filename );
 static void substring_indices( char *src, char *dest, const int start, const int end );
 static inline int num_substrings( const int str_len, const int window_size );
@@ -139,7 +140,7 @@ void get_kmer_totals( hash_table_t *target_kmers,
         int num_subsets = num_substrings( oligo_size, WINDOW_SIZE );
 
         unsigned int inner_index = 0;
-        int *val_copy = NULL;
+        kmer_t *val_copy = NULL;
 
         HT_Entry **my_items     = NULL;
         HT_Entry **subset_items = NULL;
@@ -155,9 +156,8 @@ void get_kmer_totals( hash_table_t *target_kmers,
 
         for( index = 0; index < target_ptr->size; index++ )
             {
-                val_copy = malloc( sizeof( int ) );
-                *val_copy = *( (int*)(items[ index ]->value) );
-
+                val_copy = malloc( sizeof( kmer_t ) );
+                copy_kmer( val_copy, items[ index ]->value );
                 ht_add( target_copy, items[ index ]->key,
                         val_copy );
             }
@@ -502,4 +502,14 @@ static inline void add_valid_kmers( kmer_t **kmers, const unsigned int num_subse
                     free( current_kmer );
                 }
         }
+}
+
+
+static inline void copy_kmer( kmer_t *dest, kmer_t *src )
+{
+    dest->seq = malloc( sizeof( char ) * strlen( src->seq ) + 1 );
+    strcpy( dest->seq, src->seq );
+    dest->kmer_start = src->kmer_start;
+    dest->kmer_end   = src->kmer_end;
+    dest->kmer_score = src->kmer_score;
 }
