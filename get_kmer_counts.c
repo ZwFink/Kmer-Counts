@@ -224,19 +224,15 @@ static inline bool tolerable_match( char *a, char *b, int size, int num_mismatch
     int index = 0;
     int mismatches = 0;
 
-    if( a[ 0 ] == b[ 0 ]
-        || a[ size ] == b[ size ]
-      )
+
+    for( index = 0; index < size; index++ )
         {
-            for( index = 0; index < size; index++ )
+            if( a[ index ] - b[ index ] )
                 {
-                    if( a[ index ] - b[ index ] )
+                    mismatches++;
+                    if( mismatches > num_mismatches )
                         {
-                            mismatches++;
-                            if( mismatches > num_mismatches )
-                                {
-                                    return false;
-                                }
+                            return false;
                         }
                 }
         }
